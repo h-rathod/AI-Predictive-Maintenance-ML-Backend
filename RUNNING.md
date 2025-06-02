@@ -43,7 +43,8 @@ Verify that your model files exist in the `src/main/resources/model/` directory:
 - `autoencoder.model` - Anomaly detection model
 - `rf_failure.model` - Failure prediction model
 - `rf_health_index.model` - Health index estimation model
-- `rul.model` - Remaining Useful Life prediction model
+- `part_risk.model` - Part Risk prediction model
+- `part_risk_normalizer.bin` - Normalizer for Part Risk model
 - `threshold.bin` - Anomaly detection threshold
 
 If any are missing, the system will create fallback models automatically, but these are not as accurate.
@@ -81,7 +82,7 @@ For optimal results, configure your sensor data collection and inference frequen
 - Set the sensor data collection to run every **5.5 seconds**
 - The prediction pipeline runs every **60 seconds** by default
 
-This ensures each inference run processes 11 completely new data points (exactly matching the RUL model's expected sequence length).
+This ensures each inference run processes a sufficient number of new data points for accurate predictions.
 
 ### 2. Custom Scheduling Rate
 
@@ -136,7 +137,7 @@ CREATE TABLE predictions (
     is_anomaly BOOLEAN,
     failure_prob DOUBLE PRECISION,
     health_index DOUBLE PRECISION,
-    rul DOUBLE PRECISION
+    rul TEXT -- Contains part at risk information
 );
 ```
 
@@ -147,7 +148,7 @@ CREATE TABLE predictions (
    ```
    Received 10 records from Supabase API
    Fetched 10 sensor data records via REST API
-   Stored prediction result: anomaly=true, failure_prob=0.0, health_index=46.77, rul=500.0
+   Stored prediction result: anomaly=true, failure_prob=0.0, health_index=46.77, rul="Part at risk: Compressor (Warning)"
    Storage response status: 201 CREATED
    ```
 
@@ -165,7 +166,7 @@ The prediction results include:
 - `anomaly` (boolean): Indicates if current data shows abnormal patterns
 - `failure_prob` (0.0-1.0): Probability of imminent failure
 - `health_index` (0-100): Equipment health score (higher is better)
-- `rul` (numeric): Remaining Useful Life estimate in time units
+- `rul` (text): Part at risk information in format "Part at risk: [component] ([condition])"
 
 ## Troubleshooting
 
@@ -173,4 +174,4 @@ The prediction results include:
 - **API Connection Errors**: Verify your Supabase URL and API key
 - **Data Fetching Issues**: Ensure the sensor_data table exists and contains data
 - **Timestamp Format Errors**: The system supports multiple timestamp formats but check logs for parsing issues
-- **Input Shape Errors**: The RUL model expects exactly 11 sequential data points
+- **Input Shape Errors**: Ensure sensor data contains all required features for the Part Risk model (12 numeric features)

@@ -9,7 +9,7 @@ The system uses four different machine learning models to provide a comprehensiv
 1. **Anomaly Detection Model (Autoencoder)**
 2. **Failure Prediction Model (Random Forest)**
 3. **Health Index Estimation Model (Random Forest)**
-4. **Remaining Useful Life (RUL) Prediction Model (LSTM)**
+4. **Part Risk Prediction Model (Neural Network)**
 
 Each model serves a specific purpose in the predictive maintenance pipeline and together they provide a comprehensive view of equipment health and potential failure conditions.
 
@@ -126,62 +126,102 @@ rf.setMaxDepth(15);        // Deeper trees for more precise regression
 rf.setSeed(42);            // Random seed for reproducibility
 ```
 
-## 4. Remaining Useful Life (RUL) Prediction Model
+## 4. Part Risk Prediction Model
 
-### Technology: LSTM Neural Network (DL4J)
+### Technology: Neural Network (DL4J)
 
-The RUL prediction model is implemented as a Long Short-Term Memory (LSTM) neural network using the DeepLearning4J library. LSTM networks are specifically designed to handle sequential data and can capture temporal dependencies.
+The Part Risk prediction model is implemented as a multi-class classification neural network using the DeepLearning4J library. This model identifies which specific refrigerator component is most likely to fail based on sensor data patterns.
 
 ### How It Works
 
-1. **Input**: The model takes a sequence of 11 sensor data readings (normalized).
+1. **Input**: The model takes 12 numeric sensor features (normalized).
 2. **Architecture**: The model consists of:
-   - LSTM layers (11 → 64 → 32)
-   - Dense layer (32 → 16)
-   - Output layer (16 → 1)
-3. **Training**: During training, the model learns to predict RUL from sequences of sensor readings.
-4. **Inference**: The model outputs a single value representing the estimated remaining useful life in appropriate units (hours, days, cycles, etc.).
+   - Input Layer: 12 units (one per feature)
+   - Hidden Layer: 32 units with ReLU activation
+   - Output Layer: 6 units with softmax activation for multi-class classification
+3. **Training**: During training, the model learns to classify which part is at risk based on sensor patterns.
+4. **Inference**: The model outputs the most likely part at risk along with condition severity and the associated sensor column.
+
+### Target Classes (Parts at Risk)
+
+- Evaporator Coil
+- Freezer Compartment
+- Fridge Section
+- Fresh Food Section
+- Compressor
+- Refrigerant System
+
+### Condition Labels
+
+- **Critical**: Immediate action needed (e.g., Compressor vibration > 0.7 mm/s)
+- **Warning**: Potential issue (e.g., Compressor vibration > 0.5 mm/s but ≤ 0.7 mm/s)
+- **Good**: No issues detected
+
+### Input Features
+
+The model uses 12 numeric columns from `part_risk_data.csv`:
+
+- `temperature_evaporator` (°C, Evaporator Coil)
+- `temperature_internal` (°C, Freezer Compartment)
+- `ambient_temperature` (°C, Fridge Section)
+- `humidity_internal` (%, Fresh Food Section)
+- `pressure_refrigerant` (kPa, Refrigerant System)
+- `current_compressor` (A, Compressor)
+- `vibration_level` (mm/s, Compressor)
+- `gas_leak_level` (ppm, Refrigerant System)
+- `compressor_cycle_time` (seconds)
+- `energy_consumption` (kWh)
+- `temperature_gradient` (°C/h)
+- `pressure_trend` (kPa/h)
 
 ### Model Files
 
-- **rul.model**: The serialized DeepLearning4J LSTM network for RUL prediction (~31KB)
+- **part_risk.model**: The serialized DeepLearning4J neural network for part risk prediction
+- **part_risk_normalizer.bin**: Normalizer for scaling input features to [0, 1]
 
 ### Training Process
 
-The RUL model is trained using the `RulTrainer.java` class, which:
+The Part Risk model is trained using the `PartRiskTrainer.java` class, which:
 
-1. Loads a dataset with sequential sensor readings and their corresponding RUL values
-2. Normalizes the data using global mean and standard deviation
-3. Creates sequences of specified length (11 time steps)
-4. Configures the LSTM network architecture
-5. Trains the model using backpropagation with MSE loss function
-6. Evaluates the model on a test set
-7. Saves the trained model to disk
+1. Loads the `part_risk_data.csv` dataset (10,000 rows) with labeled examples
+2. Applies `NormalizerMinMaxScaler` to scale features to [0, 1]
+3. Splits the data into training (80%) and testing (20%) sets
+4. Configures the neural network architecture
+5. Trains the model using multi-class cross-entropy loss and Adam optimizer
+6. Evaluates the model on the test set (expected accuracy ~93%)
+7. Saves both the trained model and normalizer to disk
 
 ```java
 // Key training parameters
-int numEpochs = 200;
-double learningRate = 0.005;
+int numEpochs = 10;
+double learningRate = 0.001;
 int batchSize = 32;
-int timeSeriesLength = 11;  // Critical - must match at inference time
+int hiddenLayerSize = 32;
 ```
 
 ## Additional Model Files
 
 - **mean.bin** and **std.bin**: Binary files containing the mean and standard deviation values used for normalizing the input data
 - **failure_header.model** and **health_index_header.model**: Weka Instances header files that define the attributes and structure expected by the Weka models
+- **part_risk_normalizer.bin**: Normalizer for the part risk model input data
 
 ## Data Preprocessing
 
 All models require preprocessing of raw sensor data:
 
-1. **Normalization**: Raw sensor values are normalized using pre-calculated mean and standard deviation values:
-
+1. **Normalization**: Raw sensor values are normalized using appropriate techniques:
+   
+   For Autoencoder:
    ```
    normalized_value = (raw_value - mean) / std
    ```
+   
+   For Part Risk model:
+   ```
+   normalized_value = (raw_value - min) / (max - min)  // MinMaxScaler
+   ```
 
-2. **Sequence Creation**: For LSTM models (Autoencoder and RUL), sequences of consecutive readings are created to capture temporal patterns.
+2. **Sequence Creation**: For the LSTM-based Autoencoder model, sequences of consecutive readings are created to capture temporal patterns.
 
 ## Model Integration
 
@@ -190,13 +230,19 @@ The four models work together to provide a comprehensive view of equipment healt
 1. The **Anomaly Detection** model identifies unusual behavior
 2. The **Failure Prediction** model estimates failure probability
 3. The **Health Index** model provides a continuous measure of equipment condition
-4. The **RUL** model estimates remaining operational time
+4. The **Part Risk** model identifies which specific component is most likely to fail
 
-Together, these models enable maintenance teams to make data-driven decisions about when and how to perform maintenance activities.
+Together, these models enable maintenance teams to make data-driven decisions about when and how to perform maintenance activities, with actionable insights about which specific parts require attention.
 
 ## Important Implementation Note
 
-The RUL model expects exactly 11 data points in the sequence. When running the pipeline, ensure that 11 consecutive sensor readings are fetched (as configured in `DataFetcherService.java`) to avoid sequence length mismatch errors.
+The Part Risk model provides more actionable insights than the previous RUL model by:
+
+1. Identifying the specific refrigerator part at risk (e.g., Compressor instead of a general RUL)
+2. Assessing the severity (Critical, Warning, Good) for prioritization
+3. Linking the prediction to a specific sensor column for targeted maintenance
+
+This makes the system's outputs more interpretable and actionable for end-users.
 
 ## Model Performance
 
