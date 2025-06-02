@@ -6,7 +6,7 @@ A Spring Boot backend for real-time predictive maintenance using machine learnin
 
 This application provides a complete predictive maintenance solution that:
 
-1. Loads pre-trained ML models for anomaly detection, failure prediction, health index estimation, and RUL prediction
+1. Loads pre-trained ML models for anomaly detection, failure prediction, health index estimation, and part risk prediction
 2. Fetches real-time sensor data from Supabase via REST API
 3. Preprocesses the data (normalization and sequence creation)
 4. Runs inference using the ML models
@@ -37,7 +37,7 @@ ml-backend/
 │   │   │       ├── AutoencoderTrainer.java   # Training script for autoencoder
 │   │   │       ├── FailurePredictionTrainer.java # Training script for failure model
 │   │   │       ├── HealthIndexTrainer.java   # Training script for health index model
-│   │   │       └── RulTrainer.java           # Training script for RUL model
+│   │   │       └── PartRiskTrainer.java      # Training script for part risk model
 │   │   └── resources/
 │   │       ├── model/                    # ML model files
 │   │       ├── data/                     # Training data (not used at runtime)
@@ -60,7 +60,7 @@ ml-backend/
 - **ModelLoader.java**: Loads all ML models at startup and provides fallback implementations
 - **DataPreprocessor.java**: Normalizes data and creates sequences for LSTM models
 - **SupabaseApiService.java**: Handles data fetching from Supabase via REST API
-- **InferenceService.java**: Runs predictions through all 4 ML models
+- **InferenceService.java**: Runs predictions through all ML models
 - **ResultStorageService.java**: Stores prediction results in Supabase
 - **DataFetcherService.java**: High-level service for fetching sensor data
 - **SchedulerService.java**: Schedules the prediction pipeline to run at regular intervals
@@ -82,7 +82,8 @@ ml-backend/
 - **autoencoder.model**: Deep learning model for anomaly detection (DL4J)
 - **rf_failure.model**: Random Forest model for failure prediction (Weka)
 - **rf_health_index.model**: Random Forest model for health index estimation (Weka)
-- **rul.model**: LSTM model for Remaining Useful Life prediction (DL4J)
+- **part_risk.model**: DL4J model for predicting which part is at risk of failure
+- **part_risk_normalizer.bin**: Normalizer for the part risk model input data
 - **threshold.bin**: Threshold value for anomaly detection
 
 ## ML Models
@@ -92,7 +93,7 @@ The system uses four different ML models:
 1. **Autoencoder (DL4J)**: Detects anomalies by comparing reconstruction error against a threshold
 2. **Random Forest Classifier (Weka)**: Predicts probability of failure
 3. **Random Forest Regressor (Weka)**: Estimates equipment health index (0-100)
-4. **LSTM Network (DL4J)**: Predicts Remaining Useful Life (RUL)
+4. **Deep Learning Network (DL4J)**: Predicts which part is at risk of failure (compressor, condenser, evaporator, expansion_valve, fan_motor, or none)
 
 For detailed information about the ML models, see [MLDescription.md](MLDescription.md).
 
@@ -111,12 +112,12 @@ Each prediction includes:
 - `anomaly` (boolean): Indicates if current data shows abnormal patterns
 - `failure_prob` (0.0-1.0): Probability of imminent failure
 - `health_index` (0-100): Equipment health score (higher is better)
-- `rul` (numeric): Remaining Useful Life estimate in time units
+- `part_at_risk` (string): Identifies which component is most likely to fail (compressor, condenser, evaporator, expansion_valve, fan_motor, or none)
 
 Example output:
 
 ```
-Stored prediction result: anomaly=true, failure_prob=0.0, health_index=46.77, rul=500.0
+Stored prediction result: anomaly=true, failure_prob=0.0, health_index=46.77, part_at_risk=compressor
 ```
 
 ## Extending the Application

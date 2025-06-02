@@ -48,6 +48,11 @@ public class InferenceService {
             // 4. RUL Prediction with LSTM
             double remainingUsefulLife = predictRUL(sequence);
             
+            // 5. Part Risk Prediction with DL4J
+            String[] partRiskInfo = predictPartAtRisk(latestData);
+            String partAtRisk = partRiskInfo[0];
+            String condition = partRiskInfo[1];
+            
             // Build and return the prediction result
             return PredictionResult.builder()
                     .deviceId(latestData.getDeviceId())
@@ -56,6 +61,8 @@ public class InferenceService {
                     .failureProbability(failureProbability)
                     .healthIndex(healthIndex)
                     .remainingUsefulLife(remainingUsefulLife)
+                    .partAtRisk(partAtRisk)
+                    .condition(condition)
                     .build();
         } catch (Exception e) {
             log.error("Error during inference: {}", e.getMessage(), e);
@@ -164,6 +171,110 @@ public class InferenceService {
             log.warn("Using fallback RUL value due to model error");
             // Return a reasonable fallback value
             return 500.0;
+        }
+    }
+    
+    /**
+     * Predict which part is at risk using the Part Risk DL4J model
+     * @param sensorData The latest sensor data
+     * @return String array with [partAtRisk, condition]
+     */
+    private String[] predictPartAtRisk(SensorData sensorData) {
+        try {
+            // Get the part risk model
+            if (modelLoader.getPartRiskModel() == null) {
+                log.warn("Part risk model not available. Using fallback values.");
+                return new String[] {"unknown", "normal"};
+            }
+            
+            // Create input features array from sensor data
+            // We need all 11 features from SensorData plus a derived feature for the part risk model
+            double[] features = new double[12];
+            features[0] = sensorData.getFeature1();  // evaporator_coil_temperature
+            features[1] = sensorData.getFeature2();  // fridge_temperature
+            features[2] = sensorData.getFeature3();  // freezer_temperature
+            features[3] = sensorData.getFeature4();  // air_temperature
+            features[4] = sensorData.getFeature5();  // humidity
+            features[5] = sensorData.getFeature6();  // compressor_vibration_x
+            features[6] = sensorData.getFeature7();  // compressor_vibration_y
+            features[7] = sensorData.getFeature8();  // compressor_vibration_z
+            features[8] = sensorData.getFeature9();  // compressor_current
+            features[9] = sensorData.getFeature10(); // input_voltage
+            features[10] = sensorData.getFeature11(); // gas_leakage_level
+            // Add a derived feature (e.g., average of vibration values) as the 12th feature
+            features[11] = (features[5] + features[6] + features[7]) / 3.0; // Average vibration
+            
+            // Convert to INDArray
+            INDArray input = Nd4j.create(features).reshape(1, 12);
+            
+            // Apply normalizer if available
+            if (modelLoader.getPartRiskNormalizer() != null) {
+                // Create a dataset with the input
+                org.nd4j.linalg.dataset.api.preprocessor.NormalizerMinMaxScaler normalizer = 
+                    modelLoader.getPartRiskNormalizer();
+                
+                // We need to create a fake dataset with our input for normalization
+                org.nd4j.linalg.dataset.DataSet dummyDataSet = 
+                    new org.nd4j.linalg.dataset.DataSet(input, Nd4j.create(1, 6));
+                
+                // Apply normalization to features only
+                normalizer.transform(dummyDataSet);
+                
+                // Get the normalized input
+                input = dummyDataSet.getFeatures();
+            }
+            
+            // Run prediction
+            INDArray output = modelLoader.getPartRiskModel().output(input);
+            
+            // Get the predicted class (index of max value)
+            int predictedClass = Nd4j.argMax(output, 1).getInt(0);
+            
+            // Map class index to part name
+            String partAtRisk;
+            String condition;
+            
+            switch (predictedClass) {
+                case 0:
+                    partAtRisk = "compressor";
+                    condition = "warning";
+                    break;
+                case 1:
+                    partAtRisk = "condenser";
+                    condition = "warning";
+                    break;
+                case 2:
+                    partAtRisk = "evaporator";
+                    condition = "warning";
+                    break;
+                case 3:
+                    partAtRisk = "expansion_valve";
+                    condition = "warning";
+                    break;
+                case 4:
+                    partAtRisk = "fan_motor";
+                    condition = "warning";
+                    break;
+                case 5:
+                    partAtRisk = "none";
+                    condition = "normal";
+                    break;
+                default:
+                    partAtRisk = "unknown";
+                    condition = "normal";
+                    break;
+            }
+            
+            // Get the confidence score for the predicted class
+            double confidence = output.getDouble(0, predictedClass);
+            log.debug("Part risk prediction: {} with confidence {}", partAtRisk, confidence);
+            
+            return new String[] {partAtRisk, condition};
+        } catch (Exception e) {
+            log.error("Error in part risk prediction: {}", e.getMessage(), e);
+            log.warn("Using fallback part risk values due to model error");
+            // Return reasonable fallback values
+            return new String[] {"unknown", "normal"};
         }
     }
 } 

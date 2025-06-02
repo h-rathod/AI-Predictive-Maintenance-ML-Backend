@@ -59,26 +59,31 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
-        
+
         <!-- .env support -->
         <dependency>
             <groupId>io.github.cdimascio</groupId>
             <artifactId>dotenv-java</artifactId>
             <version>3.0.0</version>
         </dependency>
-        
+
         <!-- Database -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <version>42.6.0</version>
         </dependency>
-        
+
         <!-- DeepLearning4J -->
         <dependency>
             <groupId>org.deeplearning4j</groupId>
             <artifactId>deeplearning4j-core</artifactId>
             <version>${deeplearning4j.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.10.0</version>
         </dependency>
         <dependency>
             <groupId>org.nd4j</groupId>
@@ -90,14 +95,20 @@
             <artifactId>datavec-api</artifactId>
             <version>${deeplearning4j.version}</version>
         </dependency>
-        
+        <!-- Replace the current ONNX dependency -->
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+            <version>1.10.0</version>
+        </dependency>
+
         <!-- Weka -->
         <dependency>
             <groupId>nz.ac.waikato.cms.weka</groupId>
             <artifactId>weka-stable</artifactId>
             <version>${weka.version}</version>
         </dependency>
-        
+
         <!-- Other Dependencies -->
         <dependency>
             <groupId>com.opencsv</groupId>
@@ -114,7 +125,7 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
-        
+
         <!-- Jackson JSR310 (Java 8 Date/Time) module -->
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>

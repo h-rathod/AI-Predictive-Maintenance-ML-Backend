@@ -40,6 +40,7 @@ public class ModelLoader {
 
     private MultiLayerNetwork autoencoderModel;
     private MultiLayerNetwork rulModel;
+    private MultiLayerNetwork partRiskModel;
     private double threshold;
     private Classifier failureModel;
     private Classifier healthIndexModel;
@@ -47,6 +48,7 @@ public class ModelLoader {
     private double[] std;
     private Instances failureHeader;
     private Instances healthIndexHeader;
+    private org.nd4j.linalg.dataset.api.preprocessor.NormalizerMinMaxScaler partRiskNormalizer;
 
     @PostConstruct
     public void init() {
@@ -180,6 +182,51 @@ public class ModelLoader {
                 }
             } else {
                 log.warn("RUL model file not found: {}", rulFile.getAbsolutePath());
+            }
+            
+            // Try to load Part Risk model
+            File partRiskFile = new File(MODEL_DIR + "part_risk.model");
+            if (partRiskFile.exists()) {
+                log.info("Loading Part Risk model from: {}", partRiskFile.getAbsolutePath());
+                MultiLayerNetwork loadedModel = ModelSerializer.restoreMultiLayerNetwork(partRiskFile);
+                if (loadedModel != null) {
+                    partRiskModel = loadedModel;
+                    log.info("Successfully loaded Part Risk model");
+                    
+                    // Try to load the normalizer for part risk model
+                    File normalizerFile = new File(MODEL_DIR + "part_risk_normalizer.bin");
+                    if (normalizerFile.exists()) {
+                        log.info("Loading Part Risk normalizer from: {}", normalizerFile.getAbsolutePath());
+                        try {
+                            partRiskNormalizer = org.nd4j.linalg.dataset.api.preprocessor.serializer.NormalizerSerializer
+                                .getDefault().restore(normalizerFile);
+                            log.info("Successfully loaded Part Risk normalizer");
+                        } catch (Exception e) {
+                            log.error("Error loading Part Risk normalizer: {}", e.getMessage());
+                            partRiskNormalizer = new org.nd4j.linalg.dataset.api.preprocessor.NormalizerMinMaxScaler();
+                        }
+                    } else {
+                        log.warn("Part Risk normalizer file not found: {}", normalizerFile.getAbsolutePath());
+                        partRiskNormalizer = new org.nd4j.linalg.dataset.api.preprocessor.NormalizerMinMaxScaler();
+                    }
+                }
+            } else {
+                log.warn("Part Risk model file not found: {}", partRiskFile.getAbsolutePath());
+                
+                // Create a fallback part risk model
+                MultiLayerConfiguration partRiskConf = new NeuralNetConfiguration.Builder()
+                    .weightInit(WeightInit.XAVIER)
+                    .list()
+                    .layer(0, new DenseLayer.Builder().nIn(12).nOut(32).activation(Activation.RELU).build())
+                    .layer(1, new OutputLayer.Builder(LossFunctions.LossFunction.MCXENT)
+                            .nIn(32).nOut(6)
+                            .activation(Activation.SOFTMAX)
+                            .build())
+                    .build();
+                
+                partRiskModel = new MultiLayerNetwork(partRiskConf);
+                partRiskModel.init();
+                partRiskNormalizer = new org.nd4j.linalg.dataset.api.preprocessor.NormalizerMinMaxScaler();
             }
         } catch (Exception e) {
             log.error("Error loading deep learning models: {}", e.getMessage());

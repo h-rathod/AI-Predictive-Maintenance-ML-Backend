@@ -51,7 +51,18 @@ public class ResultStorageService {
             body.put("is_anomaly", result.isAnomaly());
             body.put("failure_prob", result.getFailureProbability());
             body.put("health_index", result.getHealthIndex());
-            body.put("rul", result.getRemainingUsefulLife());
+            
+            // Store part risk information in the RUL field for backward compatibility
+            // Format: "RUL: X, Part at risk: Y"
+            String partRiskInfo = "";
+            if (result.getPartAtRisk() != null && !result.getPartAtRisk().equals("none") && !result.getPartAtRisk().equals("unknown")) {
+                partRiskInfo = String.format("%s (Part at risk: %s)", 
+                        result.getRemainingUsefulLife(), 
+                        result.getPartAtRisk());
+                body.put("rul", partRiskInfo);
+            } else {
+                body.put("rul", result.getRemainingUsefulLife());
+            }
             
             // Create HTTP entity with headers and body
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
@@ -60,11 +71,12 @@ public class ResultStorageService {
             String url = supabaseUrl + "/rest/v1/predictions";
             ResponseEntity<Map> response = restTemplate.postForEntity(url, entity, Map.class);
             
-            log.info("Stored prediction result: anomaly={}, failure_prob={}, health_index={}, rul={}", 
+            log.info("Stored prediction result: anomaly={}, failure_prob={}, health_index={}, rul={}, part_at_risk={}", 
                     result.isAnomaly(), 
                     result.getFailureProbability(), 
                     result.getHealthIndex(), 
-                    result.getRemainingUsefulLife());
+                    result.getRemainingUsefulLife(),
+                    result.getPartAtRisk());
             
             log.debug("Storage response status: {}", response.getStatusCode());
         } catch (Exception e) {
