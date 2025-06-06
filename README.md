@@ -93,7 +93,7 @@ The system uses four different ML models:
 1. **Autoencoder (DL4J)**: Detects anomalies by comparing reconstruction error against a threshold
 2. **Random Forest Classifier (Weka)**: Predicts probability of failure
 3. **Random Forest Regressor (Weka)**: Estimates equipment health index (0-100)
-4. **Deep Learning Network (DL4J)**: Predicts which part is at risk of failure (compressor, condenser, evaporator, expansion_valve, fan_motor, or none)
+4. **Multi-class Classification Model (DL4J)**: Predicts which part is at risk of failure (compressor, condenser, evaporator, expansion_valve, fan_motor, or none)
 
 For detailed information about the ML models, see [MLDescription.md](MLDescription.md).
 
