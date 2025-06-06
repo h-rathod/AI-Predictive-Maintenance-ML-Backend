@@ -6,34 +6,55 @@ This document provides step-by-step instructions for running the IoT Predictive 
 
 ### 1. Configure Supabase Connection
 
-You need to set environment variables for your Supabase connection:
+Your application needs credentials to connect to Supabase. The recommended and most secure way to manage these for local development is by using a `.env.local` file. This file is specific to your local environment and should **never** be committed to version control.
+
+**Understanding `.env` files:**
+- **`.env.local`**: Use this file for your personal, local-specific settings and sensitive credentials (like API keys). It overrides any settings in `.env`. **This file must be in your `.gitignore` file.**
+- **`.env`**: This file can be used for non-sensitive default settings for the project or as a template (e.g., `.env.example`). If it contains no secrets, it can be committed to version control.
+
+**Steps to Configure Supabase:**
+
+1.  **Create or Check `.gitignore`:**
+    Ensure your project's `.gitignore` file (usually in the `ml-back` root, create it if it doesn't exist) includes the following line to prevent committing local environment files:
+    ```
+    .env.local
+    *.env.local
+    .env.*.local
+    ```
+
+2.  **Create `.env.local` file:**
+    In the project root directory (`ml-back`), create a file named `.env.local` if it doesn't already exist.
+
+3.  **Add Supabase Credentials to `.env.local`:**
+    Open `.env.local` and add the following lines, replacing the placeholder values with your actual Supabase URL and Key:
+
+    ```env
+    SUPABASE_URL=https://your-project.supabase.co
+    SUPABASE_KEY=your-supabase-anon-key
+    ```
+    The application will automatically load these variables when it starts.
+
+**(Alternative) Using System Environment Variables:**
+If you prefer not to use a `.env.local` file, you can set these as system-wide environment variables. However, managing them via `.env.local` is generally simpler for most development workflows and helps keep project configurations isolated.
+
+*If using system variables:*
 
 **Windows CMD:**
-
-```
+```shell
 set SUPABASE_URL=https://your-project.supabase.co
 set SUPABASE_KEY=your-supabase-key
 ```
 
 **Windows PowerShell:**
-
-```
+```powershell
 $env:SUPABASE_URL="https://your-project.supabase.co"
 $env:SUPABASE_KEY="your-supabase-key"
 ```
 
-**Linux/macOS:**
-
-```
+**Linux/macOS (bash/zsh):**
+```bash
 export SUPABASE_URL=https://your-project.supabase.co
 export SUPABASE_KEY=your-supabase-key
-```
-
-Alternatively, create a `.env` file in the project root with these values:
-
-```
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_KEY=your-supabase-key
 ```
 
 ### 2. Ensure Model Files Exist
@@ -86,18 +107,34 @@ This ensures each inference run processes a sufficient number of new data points
 
 ### 2. Custom Scheduling Rate
 
-To change how often the pipeline runs (default is 60000ms = 1 minute):
+To change how often the prediction pipeline runs (default is 60000ms = 1 minute), you can set the `SCHEDULE_RATE` environment variable.
 
-**Windows:**
-
+**Recommended Method (using `.env.local`):**
+Add or update the `SCHEDULE_RATE` in your `ml-back/.env.local` file:
+```env
+SCHEDULE_RATE=30000 # Example: 30 seconds
 ```
+Then, simply run the application:
+```shell
+mvn spring-boot:run
+```
+
+**(Alternative) Using System Environment Variables:**
+
+**Windows CMD:**
+```shell
 set SCHEDULE_RATE=30000
 mvn spring-boot:run
 ```
 
-**Linux/macOS:**
-
+**Windows PowerShell:**
+```powershell
+$env:SCHEDULE_RATE="30000"
+mvn spring-boot:run
 ```
+
+**Linux/macOS (bash/zsh):**
+```bash
 export SCHEDULE_RATE=30000
 mvn spring-boot:run
 ```
